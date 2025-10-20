@@ -1,0 +1,7 @@
+# IDE directories
+.vscode/
+
+# Bazel generated files and directories
+/bazel-*
+
+
