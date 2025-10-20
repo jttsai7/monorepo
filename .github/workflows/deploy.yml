@@ -98,10 +98,10 @@ jobs:
           push: true
           # tags: 為建置好的映像檔打上標籤 (版本號)。
           # 我們打了兩個標籤，用換行符分隔：
+          # 第一個標籤是 'latest'，永遠指向最新的版本。
+          # 第二個標籤是唯一的 Git Commit SHA，例如 'a1b2c3d'。這是最佳實踐，確保了每個映像檔版本都可追溯。  
           tags: |
-            # 第一個標籤是 'latest'，永遠指向最新的版本。
             ghcr.io/${{ github.repository }}/${{ matrix.service }}:latest
-            # 第二個標籤是唯一的 Git Commit SHA，例如 'a1b2c3d'。這是最佳實踐，確保了每個映像檔版本都可追溯。
             ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}
 
   # ---------------------------------------------------------------------------
