@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shopping-cart-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shopping-cart
+  template:
+    metadata:
+      labels:
+        app: shopping-cart
+    spec:
+      containers:
+      - name: shopping-cart-container
+        # image 指向 shopping-cart 專屬的遠端映像檔。
+        image: ghcr.io/jttsai7/monorepo/shopping-cart:latest
+        imagePullPolicy: Always
+        command: ["/app/shopping_cart_service"]
+        ports:
+        - containerPort: 8083
+        # env 區塊用來向容器注入環境變數。
+        # 我們的 C++ 程式會讀取這些環境變數來找到它所依賴的其他服務。
+        env:
+        # 注入第一個環境變數。
+        - name: USER_SERVICE_HOST
+          # value 是 user-management-service 的 DNS 名稱，與其 Service 名稱完全一致。
+          value: "user-management-service"
+        # 注入第二個環境變數。
+        - name: USER_SERVICE_PORT
+          # value 是 user-management-service 監聽的端口 (port: 80)。
+          value: "80"
+        - name: PRODUCT_SERVICE_HOST
+          value: "product-catalog-service"
+        - name: PRODUCT_SERVICE_PORT
+          value: "80"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shopping-cart-service
+spec:
+  selector:
+    app: shopping-cart
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8083
+  type: ClusterIP

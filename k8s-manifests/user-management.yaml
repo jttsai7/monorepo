@@ -1,0 +1,67 @@
+# apiVersion 指定了建立這個物件所使用的 Kubernetes API 版本。
+# 'apps/v1' 是用於管理應用程式部署 (Deployment)、副本集 (ReplicaSet) 等資源的穩定版本。
+apiVersion: apps/v1
+# kind 指定了要建立的資源類型，這裡是 Deployment (部署)。
+kind: Deployment
+# metadata 包含了資源的元數據，例如它的名稱。
+metadata:
+  # 這是 Deployment 物件本身的名稱。
+  name: user-management-deployment
+# spec 描述了這個 Deployment 的期望狀態 (Specification)。
+spec:
+  # replicas 指定了要運行的 Pod (應用程式實例) 的副本數量。
+  replicas: 1
+  # selector 定義了這個 Deployment 如何找到它所管理的 Pods。
+  selector:
+    # matchLabels 是一個標籤選擇器，它會尋找並管理所有帶有 'app: user-management' 標籤的 Pods。
+    matchLabels:
+      app: user-management
+  # template 是 Pod 的模板，定義了當需要建立新 Pod 時，應該長什麼樣子。
+  template:
+    metadata:
+      # labels 為這個 Pod 模板加上標籤。這個標籤必須和上面的 selector.matchLabels 完全匹配，
+      # 這樣 Deployment 才能正確地識別和管理由它建立的 Pods。
+      labels:
+        app: user-management
+    spec:
+      # containers 是一個列表，定義了在這個 Pod 中運行的所有容器。
+      containers:
+      - name: user-management-container # 容器的名稱，在 Pod 內部必須是唯一的。
+        # image 指定了要使用的 Docker 映像檔。
+        # 這是我們為 user-management 服務獨立建置的映像檔在遠端倉庫中的路徑。
+        # YOUR_GITHUB_USERNAME 在 CI/CD 流程中會被替換成你的 GitHub 帳號。
+        image: ghcr.io/jttsai7/monorepo/user-management:latest
+        # imagePullPolicy 告訴 K8s 拉取映像檔的策略。
+        # 'Always' 表示每次建立 Pod 時，都強制從遠端倉庫重新拉取最新的映像檔。這在 CI/CD 中至關重要。
+        imagePullPolicy: Always
+        # command 覆蓋了 Dockerfile 的 CMD，明確指定容器啟動時要執行的指令。
+        command: ["/app/user_service"]
+        # ports 宣告了容器內部應用程式正在監聽的端口號。
+        ports:
+        - containerPort: 8081
+---
+# "---" 用來在同一個 YAML 檔案中分隔多個 Kubernetes 資源定義。
+
+# 這是一個 Service (服務) 物件的定義。
+apiVersion: v1
+kind: Service
+metadata:
+  # Service 的名稱。這個名稱非常重要，它會成為叢集內部其他服務用來訪問此服務的 DNS 名稱。
+  name: user-management-service
+spec:
+  # selector 告訴這個 Service 要將網路流量轉發到哪些 Pod。
+  # 它會選擇所有帶有 'app: user-management' 標籤的 Pod。
+  selector:
+    app: user-management
+  ports:
+    - protocol: TCP # 協議類型。
+      # port 是 Service 自己在叢集內部監聽的端口。
+      # 其他服務將會連接到這個 Service 的 80 端口。
+      port: 80
+      # targetPort 是流量最終要被轉發到 Pod 內部容器的哪個端口。
+      # 這裡，Service 的 80 端口會對應到 Pod 的 8081 端口。
+      targetPort: 8081
+  # type 指定了 Service 的類型。
+  # 'ClusterIP' 表示這個 Service 只會有一個叢集內部的 IP 位址，它無法從叢集外部直接訪問。
+  # 這是後端服務最安全的標準設定。
+  type: ClusterIP

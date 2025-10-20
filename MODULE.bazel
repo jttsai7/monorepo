@@ -1,0 +1,6 @@
+# monorepo/MODULE.bazel
+
+module(
+    name = "monorepo",
+    version = "0.1.0",
+)

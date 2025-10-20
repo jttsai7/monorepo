@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway-container
+        # image 指向 api-gateway 專屬的遠端映像檔。
+        image: ghcr.io/jttsai7/monorepo/api-gateway:latest
+        imagePullPolicy: Always
+        command: ["/app/api_gateway_service"]
+        ports:
+        - containerPort: 8080
+        # 為 API Gateway 注入它所依賴的所有後端服務的位址。
+        env:
+        - name: USER_SERVICE_HOST
+          value: "user-management-service"
+        - name: USER_SERVICE_PORT
+          value: "80"
+        - name: PRODUCT_SERVICE_HOST
+          value: "product-catalog-service"
+        - name: PRODUCT_SERVICE_PORT
+          value: "80"
+        - name: CART_SERVICE_HOST
+          value: "shopping-cart-service"
+        - name: CART_SERVICE_PORT
+          value: "80"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-service
+spec:
+  selector:
+    app: api-gateway
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  # type: LoadBalancer 是專為雲端環境設計的。
+  # 當你在 GKE 這樣的雲端平台上建立此類型的 Service 時，
+  # 雲端供應商會自動為你配置一個真正的網路負載平衡器，
+  # 並為它分配一個可以從網際網路訪問的公開、靜態的 IP 位址。
+  # 這就是我們系統的對外入口。
+  type: LoadBalancer

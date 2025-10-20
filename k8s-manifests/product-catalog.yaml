@@ -1,0 +1,47 @@
+# apiVersion 和 kind 與之前相同。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Deployment 名稱改為 product-catalog-deployment。
+  name: product-catalog-deployment
+spec:
+  replicas: 1
+  # selector 匹配 'app: product-catalog' 標籤。
+  selector:
+    matchLabels:
+      app: product-catalog
+  # Pod 模板
+  template:
+    metadata:
+      # Pod 自身帶有 'app: product-catalog' 標籤。
+      labels:
+        app: product-catalog
+    spec:
+      containers:
+      - name: product-catalog-container
+        # image 指向 product-catalog 專屬的遠端映像檔。
+        image: ghcr.io/jttsai7/monorepo/product-catalog:latest
+        # 拉取策略為 Always。
+        imagePullPolicy: Always
+        # command 執行的是 product_service 這個執行檔。
+        command: ["/app/product_service"]
+        ports:
+        - containerPort: 8082
+---
+apiVersion: v1
+kind: Service
+metadata:
+  # Service 的 DNS 名稱是 product-catalog-service。
+  name: product-catalog-service
+spec:
+  # selector 尋找帶有 'app: product-catalog' 標籤的 Pod。
+  selector:
+    app: product-catalog
+  ports:
+    - protocol: TCP
+      # Service 在叢集內部監聽 80 端口。
+      port: 80
+      # 將流量轉發到 Pod 的 8082 端口。
+      targetPort: 8082
+  # 類型為 ClusterIP，僅供內部訪問。
+  type: ClusterIP

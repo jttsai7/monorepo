@@ -1,0 +1,163 @@
+# -----------------------------------------------------------------------------
+# 手冊封面：基本資訊
+# -----------------------------------------------------------------------------
+
+# name: 這本操作手冊的標題，它會顯示在你的 GitHub "Actions" 頁面上，方便你識別。
+name: Build and Deploy Microservices to GKE
+
+# on: 觸發這本手冊的「開關」。
+# 這裡的設定表示，只有當...
+on:
+  # ...有 "push" (推送) 的動作發生時...
+  push:
+    # ...且這個動作是發生在 "main" 這個分支上時...
+    branches:
+      - main
+    # ...這本手冊的流程才會被啟動。
+
+# -----------------------------------------------------------------------------
+# 手冊附錄：共用資訊 (環境變數)
+# -----------------------------------------------------------------------------
+
+# env: 這裡定義了可以在整本手冊中重複使用的「共用變數」。
+# 這樣做的好處是，如果未來叢集名稱或地點變了，我們只需要修改這裡一處即可。
+env:
+  # GCP_PROJECT_ID: 你的 Google Cloud 專案 ID。
+  # ${{ secrets.GCP_PROJECT_ID }} 是一個特殊的語法，表示「去 GitHub 的保險箱 (Secrets) 裡，
+  # 拿出名為 GCP_PROJECT_ID 的那張紙條上的內容」。
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  # GKE_CLUSTER: 你的 GKE 叢集名稱。
+  GKE_CLUSTER: a-cool-cluster-name
+  # GKE_ZONE: 你的 GKE 叢集所在的地理區域。
+  GKE_ZONE: us-central1-c
+
+# -----------------------------------------------------------------------------
+# 手冊正文：主要章節 (Jobs)
+# -----------------------------------------------------------------------------
+
+# jobs: 這本手冊包含的主要工作章節。我們可以定義多個章節，並讓它們按順序或並行執行。
+jobs:
+  # ---------------------------------------------------------------------------
+  # 第一章：建置並推送映像檔
+  # ---------------------------------------------------------------------------
+  # build-and-push-images: 這是第一章的標題 (Job ID)。
+  build-and-push-images:
+    # name: 這一章在 GitHub Actions 頁面上顯示的正式名稱。
+    name: Build and Push Images
+    # runs-on: 指定執行這一章的「工作車間」。'ubuntu-latest' 表示使用 GitHub 提供的最新版 Ubuntu 虛擬機。
+    runs-on: ubuntu-latest
+    # permissions: 為這一章的機器人授予特定的「權限」。
+    permissions:
+      # contents: read 表示機器人有權限讀取你的程式碼倉庫。
+      contents: read
+      # packages: write 表示機器人有權限將建置好的 Docker 映像檔 (Package) 寫入到 GHCR。
+      packages: write
+
+    # strategy: 執行這一章的「策略」。
+    strategy:
+      # matrix: 「矩陣策略」，這是實現並行處理的關鍵！
+      matrix:
+        # service: 我們定義一個名為 'service' 的變數，它有四個可能的值。
+        # GitHub Actions 會為每一個值，都並行地啟動一個獨立的工作實例。
+        # 也就是說，它會同時啟動四台虛擬機，分別處理這四個服務的建置。
+        service: [user-management, product-catalog, shopping-cart, api-gateway]
+
+    # steps: 這一章需要執行的具體「操作步驟」。
+    steps:
+      # 步驟 1: 將程式碼從倉庫下載到工作車間
+      - name: Checkout code
+        # uses: 使用一個由社群或官方提供的「預製工具」(Action)。
+        # 'actions/checkout@v4' 是官方提供的、用來拉取程式碼的標準工具。
+        uses: actions/checkout@v4
+
+      # 步驟 2: 讓機器人登入 GHCR (GitHub 映像檔超市)
+      - name: Login to GHCR
+        # 'docker/login-action@v3' 是 Docker 官方提供的登入工具。
+        uses: docker/login-action@v3
+        # with: 為這個工具提供必要的參數。
+        with:
+          # registry: 要登入的超市地址。
+          registry: ghcr.io
+          # username: 登入的用戶名。${{ github.actor }} 會自動被替換成觸發這次流程的 GitHub 用戶名。
+          username: ${{ github.actor }}
+          # password: 登入的密碼。${{ secrets.GITHUB_TOKEN }} 是一個由 GitHub Actions 自動產生的臨時安全權杖，
+          # 讓我們無需儲存任何真實密碼，非常安全。
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 步驟 3: 為每一個服務建置並推送其專屬的 Docker 映像檔
+      - name: Build and push Docker image for ${{ matrix.service }}
+        # 'docker/build-push-action@v5' 是 Docker 官方提供的建置與推送工具。
+        uses: docker/build-push-action@v5
+        with:
+          # context: 建置上下文的路徑。'.' 表示使用整個專案的根目錄 (`/monorepo`)。
+          context: .
+          # file: Dockerfile 的具體路徑。${{ matrix.service }} 會被依序替換成 'user-management', 'product-catalog' 等。
+          # 所以它會依序找到 `./services/user-management/Dockerfile` 等檔案。
+          file: ./services/${{ matrix.service }}/Dockerfile
+          # push: true 表示建置成功後，要將映像檔推送到遠端倉庫。
+          push: true
+          # tags: 為建置好的映像檔打上標籤 (版本號)。
+          # 我們打了兩個標籤，用換行符分隔：
+          tags: |
+            # 第一個標籤是 'latest'，永遠指向最新的版本。
+            ghcr.io/${{ github.repository }}/${{ matrix.service }}:latest
+            # 第二個標籤是唯一的 Git Commit SHA，例如 'a1b2c3d'。這是最佳實踐，確保了每個映像檔版本都可追溯。
+            ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}
+
+  # ---------------------------------------------------------------------------
+  # 第二章：部署到 GKE
+  # ---------------------------------------------------------------------------
+  # deploy-to-gke: 這是第二章的標題。
+  deploy-to-gke:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    # needs: 這是至關重要的「依賴關係」設定。
+    # 它告訴 GitHub Actions：「必須等上一章 `build-and-push-images` 完全成功後，才能開始執行這一章。」
+    # 這確保了我們不會去部署一個還沒建置好的映像檔。
+    needs: build-and-push-images
+
+    # 操作步驟
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 步驟 1: 讓機器人獲取 GCP 的「安全通行證」
+      - id: 'auth'
+        # 'google-github-actions/auth@v2' 是 Google 官方提供的認證工具。
+        uses: 'google-github-actions/auth@v2'
+        with:
+          # workload_identity_provider: 我們在 GCP 設定好的「訪客中心 Provider」的路徑。
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          # service_account: 機器人要扮演的「機器人員工」的 Email。
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      # 步驟 2: 讓機器人連接到我們的 GKE「生產車間」
+      - name: 'Set up GKE credentials'
+        # 'google-github-actions/get-gke-credentials@v2' 是 Google 官方提供的工具。
+        uses: 'google-github-actions/get-gke-credentials@v2'
+        with:
+          # 提供叢集的名稱、地點和專案 ID，工具就會自動設定好 kubectl 的連線。
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_ZONE }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      # 步驟 3: 動態修改部署藍圖 (YAML)，換上最新的映像檔版本
+      - name: Update image tags in Kubernetes manifests
+        # run: 直接在 Ubuntu 虛擬機上執行 shell 指令。
+        run: |
+          # 這是一個 for 迴圈，會遍歷我們所有的服務名稱。
+          for service in user-management product-catalog shopping-cart api-gateway; do
+            # sed 是一個強大的文本替換工具。
+            # sed -i "s|舊內容|新內容|g" ./路徑
+            # 這行指令的意思是：在指定的 YAML 檔案中，找到 `image:` 開頭的那一行，
+            # 不管它後面寫的是什麼 (`.*`)，都把它整行替換成我們剛剛建置好的、帶有唯一 commit SHA 標籤的新映像檔路徑。
+            sed -i "s|image: ghcr.io/.*/$service:.*|image: ghcr.io/${{ github.repository }}/$service:${{ github.sha }}|g" ./k8s-manifests/*$service*.yaml
+          done
+
+      # 步驟 4: 命令 GKE 按照最新的藍圖施工！
+      - name: Deploy to GKE
+        run: |
+          # kubectl apply -f <目錄> 會讓 kubectl 讀取該目錄下所有的 .yaml 檔案，
+          # 並根據這些檔案的內容，去更新 Kubernetes 叢集中的資源。
+          # 因為我們上一步已經修改了檔案中的映像檔版本，所以 GKE 會觸發「滾動更新」。
+          kubectl apply -f ./k8s-manifests/
