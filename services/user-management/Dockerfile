@@ -12,14 +12,14 @@ WORKDIR /app
 # 將必要的原始碼複製到容器中
 # 修正: 來源路徑改為相對於 context (monorepo) 的完整路徑
 COPY services/httplib.h .
-COPY services/user-management/main.cpp ./user-management/
+COPY services/user-management/main.cpp main.cpp
 
 # 編譯 user_service 執行檔
 # -o 指定輸出檔名
 # -I. 告訴編譯器在目前目錄尋找標頭檔 (httplib.h)
 # -lpthread 連結 POSIX 線程函式庫
 # -static 進行靜態連結，產生無依賴的執行檔
-RUN g++ -std=c++17 -o user_service user-management/main.cpp -I. -lpthread -static
+RUN g++ -std=c++17 -o user_service main.cpp -I. -lpthread -static
 
 # --- 階段二: 運行 ---
 # 再次使用一個全新的、乾淨的 Alpine 作為最終的運行環境

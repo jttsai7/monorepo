@@ -3,11 +3,11 @@
 FROM alpine:latest AS builder
 RUN apk add --no-cache build-base
 WORKDIR /app
-COPY httplib.h .
-COPY product-catalog/main.cpp ./product-catalog/
+COPY services/httplib.h .
+COPY services/product-catalog/main.cpp main.cpp
 
 # 編譯 product_service 執行檔
-RUN g++ -std=c++17 -o product_service product-catalog/main.cpp -I. -lpthread -static
+RUN g++ -std=c++17 -o product_service main.cpp -I. -lpthread -static
 
 # --- 階段二: 運行 ---
 FROM alpine:latest
