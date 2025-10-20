@@ -15,6 +15,14 @@ on:
       - main
     # ...這本手冊的流程才會被啟動。
 
+# permissions: 為整個工作流程授予權限
+permissions:
+  # contents: read 是預設需要的，用於 checkout code (拉取程式碼)
+  contents: read
+  # id-token: write 是 OIDC 認證 (Workload Identity Federation) 所必需的權限！
+  # 它允許 workflow 向 GitHub 的 OIDC 提供商請求身份令牌 (數位護照)。
+  id-token: write
+
 # -----------------------------------------------------------------------------
 # 手冊附錄：共用資訊 (環境變數)
 # -----------------------------------------------------------------------------
@@ -27,9 +35,9 @@ env:
   # 拿出名為 GCP_PROJECT_ID 的那張紙條上的內容」。
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   # GKE_CLUSTER: 你的 GKE 叢集名稱。
-  GKE_CLUSTER: a-cool-cluster-name
+  GKE_CLUSTER: ms-dev-cluster
   # GKE_ZONE: 你的 GKE 叢集所在的地理區域。
-  GKE_ZONE: us-central1-c
+  GKE_ZONE: us-west1-b
 
 # -----------------------------------------------------------------------------
 # 手冊正文：主要章節 (Jobs)
